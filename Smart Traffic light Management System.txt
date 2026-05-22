@@ -1,0 +1,96 @@
+#include "main.h"
+#include <stdlib.h>
+
+/* Traffic Lane Structure */
+typedef struct {
+    GPIO_TypeDef* port;
+    uint16_t red;
+    uint16_t yellow;
+    uint16_t green;
+} TrafficLane;
+
+/* Lane Configuration */
+TrafficLane lanes[4] = {
+    {GPIOA, GPIO_PIN_5, GPIO_PIN_6, GPIO_PIN_7},
+    {GPIOB, GPIO_PIN_4, GPIO_PIN_5, GPIO_PIN_6},
+    {GPIOA, GPIO_PIN_0, GPIO_PIN_1, GPIO_PIN_4},
+    {GPIOA, GPIO_PIN_13, GPIO_PIN_14, GPIO_PIN_15}
+};
+
+/* Function Prototypes */
+void SystemClock_Config(void);
+void LED_Init(void);
+void Control_Lane(uint8_t lane, uint8_t density);
+void Reset_All_Lights(void);
+
+/* Initialize GPIO */
+void LED_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        GPIO_InitStruct.Pin = lanes[i].red | lanes[i].yellow | lanes[i].green;
+        HAL_GPIO_Init(lanes[i].port, &GPIO_InitStruct);
+    }
+}
+
+/* Control traffic light based on density */
+void Control_Lane(uint8_t lane, uint8_t density)
+{
+    if (lane >= 4) return;
+
+    /* OFF all first */
+    HAL_GPIO_WritePin(lanes[lane].port, lanes[lane].red | lanes[lane].yellow | lanes[lane].green, GPIO_PIN_RESET);
+
+    if (density < 30)
+    {
+        HAL_GPIO_WritePin(lanes[lane].port, lanes[lane].green, GPIO_PIN_SET);
+    }
+    else if (density < 70)
+    {
+        HAL_GPIO_WritePin(lanes[lane].port, lanes[lane].yellow, GPIO_PIN_SET);
+    }
+    else
+    {
+        HAL_GPIO_WritePin(lanes[lane].port, lanes[lane].red, GPIO_PIN_SET);
+    }
+}
+
+/* Reset all lights */
+void Reset_All_Lights(void)
+{
+    for (uint8_t i = 0; i < 4; i++)
+    {
+        HAL_GPIO_WritePin(lanes[i].port,
+                          lanes[i].red | lanes[i].yellow | lanes[i].green,
+                          GPIO_PIN_RESET);
+    }
+}
+
+/* Main */
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    LED_Init();
+
+    srand(1); // stable random (avoids undefined HAL_GetTick dependency issues)
+
+    while (1)
+    {
+        for (uint8_t lane = 0; lane < 4; lane++)
+        {
+            uint8_t density = rand() % 100;
+            Control_Lane(lane, density);
+        }
+
+        HAL_Delay(2000);
+    }
+}
